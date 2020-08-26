@@ -24,10 +24,10 @@ class TicTacToe:
         self._max_moves = self._rows * self._cols
         self._currentmove = 0
 
-        self._reward_win  = 2.0
-        self._reward_lose = 0.0
+        self._reward_win  = 1.0
+        self._reward_lose = -1.0
         self._reward_draw = 0.2
-        self._reward_draw_opponent = 0.3
+        self._reward_draw_opponent = 0.5
 
         self._gameStarted = False
         self._gameEnded = False
@@ -35,6 +35,7 @@ class TicTacToe:
 
         self.trainresults = []
         self.testresults = []
+        self.start()
 
     def initiatePlayers(self):
         for player, symbol in zip(self.players, self.symbols):
@@ -129,37 +130,52 @@ class TicTacToe:
         self.players[index] = new_player
         self.initiatePlayers()
 
-    def playRound(self):
-        if self.activeplayer.trainable:
+    def play(self):
+        if not self.activeplayer.isHuman():
             self.queryNonHumanPlayer()
             self.reset()
 
-    def getTrainingResults(self, result):
-        self.trainresults.append(result)
+    def getResults(self, result):
+        self.battleresults.append(result)
 
-    def train(self, number_of_rounds=100):
-        self._verbose = False
-        self.trainresults = []
-        self.signalGUItoReset = self.getTrainingResults
+    def train(self, number_of_rounds=100, number_of_battles=100):
+        self._verbose = True
+        self.battleresults = []
+        self.signalGUItoReset = self.getResults
 
+        gamecount, player1wins, player2wins, draws = [], [], [], []
         for round in tqdm.tqdm(range(number_of_rounds)):
-            self.playRound()
+            for battle in range(number_of_battles):
+                self.play()
+            gamecount.append(round*number_of_battles)
+            player1wins.append(self.battleresults.count(self.players[0].symbol)*100.0/number_of_battles)
+            player2wins.append(self.battleresults.count(self.players[1].symbol)*100.0/number_of_battles)
+            draws.append(self.battleresults.count(0)*100.0/number_of_battles)
+            gamecount.append((round+1)*number_of_battles)
+            player1wins.append(player1wins[-1])
+            player2wins.append(player2wins[-1])
+            draws.append(draws[-1])
+            self.battleresults = []
+
+        #print(self.player1wins, self.player2wins, self.draws)
         mostwins = 0
+        totalwins = 0
         bestplayer = None
         for player in self.players:
             if player.wins >= mostwins:
                 mostwins = player.wins
                 bestplayer = player
-            print("{}: {} games won.".format(player.name, player.wins / number_of_rounds))
-        print("{} games ended in draw.".format((number_of_rounds - self.players[0].wins - self.players[1].wins)/number_of_rounds))
+                totalwins += player.wins / number_of_rounds / number_of_battles
+            print("{}: {} games won.".format(player.name, player.wins / number_of_rounds / number_of_battles))
+        print("{} games ended in draw.".format(number_of_rounds*number_of_battles - totalwins))
         bestplayer.savePolicy()
-        return self.trainresults
+        return gamecount, player1wins, player2wins, draws
 
     def test(self, number_of_rounds=100):
         for player in self.players:
-            player.trainable = False
+            player._trainable = False
         for round in tqdm.tqdm(range(number_of_rounds)):
-            self.playRound()
+            self.play()
         for player in self.players:
             print("{}: {} games won.".format(player.name, player.wins / number_of_rounds))
-        print("{} games ended in draw.".format((number_of_rounds - self.players[0].wins - self.players[1].wins)/number_of_rounds))
+        print("{} games ended in draw.".format((number_of_rounds*number_of_battles - self.players[0].wins - self.players[1].wins)/number_of_rounds))

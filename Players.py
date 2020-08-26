@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import random
 import pickle
 import tqdm
@@ -11,8 +12,9 @@ class BasicPlayer:
         self.symbol = symbol
         self._human = False
         self.wins = 0
-        self.trainable = True
+        self._trainable = False
         self._verbose = True
+        self._savepath = "trained{}.pickle".format(self.__class__.__name__)
 
     def __repr__(self):
         return "Player {}: {}".format(self.name, self.symbol)
@@ -42,11 +44,21 @@ class BasicPlayer:
     def reset(self):
         pass
 
-    def loadPolicy(self):
-        pass
+    def getWeights(self):
+        raise NotImplementedError
+
+    def setWeights(self, weights):
+        raise NotImplementedError
 
     def savePolicy(self):
-        pass
+        if self._trainable:
+            with open("trained{}.pickle".format(self.__class__.__name__), "wb") as f:
+                pickle.dump(self.getWeights(), f)
+
+    def openPolicy(self):
+        if self._trainable:
+            with open("trained{}.pickle".format(self.__class__.__name__), "rb") as f:
+                self.setWeights(pickle.load(f))
 
 
 class RandomPlayer(BasicPlayer):
@@ -184,18 +196,19 @@ class ValuePlayer(BasicPlayer):
         super(ValuePlayer, self).__init__(name)
         self.wins = 0
 
-        self._lr = 0.2
+        self._lr = 0.1
         self._decay = 0.9
         self._explore = 0.3
         self._playedmoves = []
         self._boardstates = []
         self._boardvalues = []
+        self._trainable = True
 
     def getBoardState(self, board):
         return str(board.flatten().tolist())
 
     def chooseMove(self, possible_moves, board):
-        if np.random.rand(1) <= self._explore and self.trainable:
+        if np.random.rand(1) <= self._explore and self._trainable:
             move = random.choice(possible_moves)
         else:
             value_of_action_max = - np.Inf
@@ -224,7 +237,7 @@ class ValuePlayer(BasicPlayer):
         return move
 
     def reward(self, prize):
-        if not self.trainable:
+        if not self._trainable:
             return
         for move in reversed(self._playedmoves):
             boardstateindex = self._boardstates.index(move)
@@ -236,13 +249,73 @@ class ValuePlayer(BasicPlayer):
     def reset(self):
         self._playedmoves = []
 
-    def savePolicy(self):
-        with open("trainedPlayer.pickle", "wb") as f:
-            pickle.dump((self._boardstates, self._boardvalues), f)
+    def getWeights(self):
+        return (self._boardstates, self._boardvalues)
 
-    def openPolicy(self):
-        with open("trainedPlayer.pickle", "rb") as f:
-            self._boardstates, self._boardvalues = pickle.load(f)
+    def setWeights(self, weights):
+        self._boardstates, self._boardvalues = weights
 
 
-#class QPlayer(BasicPlayer):
+class NeuralPlayerBrain(torch.nn.Module):
+    def __init__(self):
+        super(NeuralPlayerBrain, self).__init__()
+        self.inputdims  = [9, 9*9, 9]
+        self.layers     = torch.nn.ModuleList()
+        self.layercount = len(self.inputdims) - 1
+        self.batchnorm  = torch.nn.BatchNorm1d(self.inputdims[0])
+        self.dropout    = torch.nn.Dropout(p=0.3)
+        self.dropoutidx = 1
+        self.activation = torch.nn.LeakyReLU(0.2)
+        self.lr         = 0.02
+
+        for i, layer in enumerate(range(self.layercount)):
+            layer_to_add = torch.nn.Linear(self.inputdims[i], self.inputdims[i+1])
+            torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
+            self.layers.append(layer_to_add)
+
+    def forward(self, x):
+        x = self.batchnorm(x)
+        for layer_index in range(self.layercount - 1):
+            if layer_index == self.dropoutidx:
+                x = self.dropout(x)
+            x = self.activation(self.layers[layer_index](x))
+        return self.layers[-1](x)
+
+
+class NeuralPlayer(BasicPlayer):
+    def __init__(self, name):
+        super(NeuralPlayer, self).__init__(name)
+        self._brain = NeuralPlayerBrain()
+        self._trainable = True
+
+    def chooseMove(self, possible_moves, board):
+        bestactionvalue = - float("Inf")
+        board = torch.from_numpy(board)
+        alternative_board = board.clone()
+        for i, possible_move in enumerate(possible_moves):
+            alternative_board[possible_move] = self.symbol
+            value = self._brain(alternative_board.flatten())
+            if value > bestactionvalue:
+                bestactionvalue = value
+                move = possible_move
+            alternative_board[possible_move] = 0
+        return move
+
+    def reward(self, prize):
+        if not self._trainable:
+            return
+        for move in reversed(self._playedmoves):
+            boardstateindex = self._boardstates.index(move)
+            value = self._boardvalues[boardstateindex]
+            value += self._lr * (self._decay * prize - value)
+            prize = value
+            self._boardvalues[boardstateindex] = value
+
+    def reset(self):
+        self._playedmoves = []
+
+    def getWeights(self):
+        return (self._boardstates, self._boardvalues)
+
+    def setWeights(self, weights):
+        self._boardstates, self._boardvalues = weights
