@@ -1,0 +1,1 @@
+This repo explores different algorithms in reinforcement learning, applied to the game of Tic Tac Toe. The stars of the show are the players, ranging from playing completely random, to beating the best.
