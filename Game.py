@@ -67,6 +67,10 @@ class TicTacToe:
                     break
         self._gameStarted = True
         self.activeplayer = self.players[self.activeplayerindex]
+        # print("player", self.activeplayer, "ishuman?", self.activeplayer.isHuman())
+        # if not self.activeplayer.isHuman():
+        #     print("playing first move")
+        #     self.queryNonHumanPlayer()
 
     def switchActivePlayer(self):
         self.activeplayerindex = (self.activeplayerindex + 1) % 2
@@ -125,6 +129,7 @@ class TicTacToe:
         self._currentmove = 0
         for player in self.players:
             player.reset()
+        self.switchActivePlayer()
 
     def loadNewPlayer(self, new_player, index=1):
         self.players[index] = new_player

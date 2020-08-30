@@ -65,7 +65,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.grid.addWidget(self.trainButton, 0, 2)
 
         # Find all player classes:
-        playerClasses = [x for x in dir(Players) if isclass(getattr(Players, x)) and 'Player' in x and 'Basic' not in x]
+        playerClasses = [x for x in dir(Players) if isclass(getattr(Players, x)) and 'Player' in x and 'Basic' not in x and 'Brain' not in x]
         self.choosePlayerComboBox = QtWidgets.QComboBox()
         for player in playerClasses:
             self.choosePlayerComboBox.addItem(player)
@@ -81,6 +81,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 newButton.setFont(QtGui.QFont('Helvetica', 60))
                 self.grid.addWidget(newButton, i+1, j)
         self.setGeometry(300, 300, 3*buttonWidth + 5, 3*buttonHeight + 60)
+
+        self.game.play()
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
@@ -102,13 +104,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.reset()
 
     def reset(self):
-        if self.game.gameIsBusy():
-            self.game.reset()
         for i in range(self.grid.count()):
             widget = self.grid.itemAt(i).widget()
             if isinstance(widget, TicTacToeButton):
                 widget.setEnabled(True)
                 widget.setText("")
+        if self.game.gameIsBusy():
+            print("resetting from GUI")
+            self.game.reset()
+        self.game.play()
+
 
     def loadNewPlayer(self, boxIndex):
         self.reset()
