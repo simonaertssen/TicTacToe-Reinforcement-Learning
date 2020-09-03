@@ -87,6 +87,7 @@ class TicTacToe:
             raise ValueError
 
     def processPlayerMove(self, move):
+        print(self.board)
         self.returnMoveToGUI(move, self.activeplayerindex)
         if self.didTheCurrentPlayerWin():
             self.activeplayer.wins += 1
@@ -115,7 +116,8 @@ class TicTacToe:
         self.signalGUItoReset(message_to_gui)
 
     def reset(self):
-        self.board = np.zeros((self._rows, self._cols))
+        self.board.fill(0)# = np.zeros((self._rows, self._cols))
+        print("reset\n", self.board)
         self._gameStarted = False
         self._gameEnded = False
         self._currentmove = 0

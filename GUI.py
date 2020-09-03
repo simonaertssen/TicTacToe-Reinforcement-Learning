@@ -82,8 +82,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.grid.addWidget(newButton, i+1, j)
         self.setGeometry(300, 300, 3*buttonWidth + 5, 3*buttonHeight + 60)
 
-        #self.game.play()
-
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
@@ -109,9 +107,6 @@ class MainWindow(QtWidgets.QMainWindow):
             if isinstance(widget, TicTacToeButton):
                 widget.setEnabled(True)
                 widget.setText("")
-        if self.game.gameIsBusy():
-            print("resetting from GUI")
-            self.game.reset()
         self.game.play()
 
 
