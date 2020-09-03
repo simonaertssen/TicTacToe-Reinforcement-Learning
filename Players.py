@@ -55,7 +55,7 @@ class BasicPlayer:
             with open("trained{}.pickle".format(self.__class__.__name__), "wb") as f:
                 pickle.dump(self.getWeights(), f)
 
-    def openPolicy(self):
+    def loadPolicy(self):
         if self._trainable:
             with open("trained{}.pickle".format(self.__class__.__name__), "rb") as f:
                 self.setWeights(pickle.load(f))
