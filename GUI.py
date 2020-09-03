@@ -77,12 +77,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Add game buttons
         for i in range(0,self.game._rows):
             for j in range(0, self.game._cols):
-                newButton = TicTacToeButton((i,j), self.game.gameIsBusy, self.game.start, self.game.humanPlayerMoved)
+                newButton = TicTacToeButton((i,j), self.game.gameIsBusy, self.game.play, self.game.humanPlayerMoved)
                 newButton.setFont(QtGui.QFont('Helvetica', 60))
                 self.grid.addWidget(newButton, i+1, j)
         self.setGeometry(300, 300, 3*buttonWidth + 5, 3*buttonHeight + 60)
 
-        self.game.play()
+        #self.game.play()
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
@@ -125,11 +125,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.game.loadNewPlayer(newPlayer)
 
     def train(self, rounds=1000):
-        self.game.start()
+        self.game.play()
         self.game.train(rounds)
 
     def test(self):
-        self.game.start()
+        self.game.play()
         self.game.test()
 
 

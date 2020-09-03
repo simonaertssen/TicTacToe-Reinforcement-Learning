@@ -18,6 +18,7 @@ class TicTacToe:
         self.initiatePlayers()
         self.activeplayer = None
         self.activeplayerindex = 0
+        self._startplayer = 0
 
         self._rows = self._cols = 3
         self.board = np.zeros((self._rows, self._cols))
@@ -35,7 +36,6 @@ class TicTacToe:
 
         self.trainresults = []
         self.testresults = []
-        self.start()
 
     def initiatePlayers(self):
         for player, symbol in zip(self.players, self.symbols):
@@ -56,21 +56,12 @@ class TicTacToe:
         if self._verbose:
             print(message)
 
-    def start(self, startplayerindex=None):
-        self.board = np.zeros((self._rows, self._cols))
-        if startplayerindex is not None:
-            self.activeplayerindex = startplayerindex
-        else:
-            for i, player in enumerate(self.players):
-                if player.isHuman():
-                    self.activeplayerindex = i
-                    break
+    def play(self):
         self._gameStarted = True
+        self.activeplayerindex = self._startplayer
         self.activeplayer = self.players[self.activeplayerindex]
-        # print("player", self.activeplayer, "ishuman?", self.activeplayer.isHuman())
-        # if not self.activeplayer.isHuman():
-        #     print("playing first move")
-        #     self.queryNonHumanPlayer()
+        if not self.activeplayer.isHuman():
+            self.queryNonHumanPlayer()
 
     def switchActivePlayer(self):
         self.activeplayerindex = (self.activeplayerindex + 1) % 2
@@ -119,6 +110,7 @@ class TicTacToe:
 
     def stop(self, message_to_gui):
         self._gameEnded = True
+        self._startplayer = (self._startplayer + 1) % 2
         self.reset()
         self.signalGUItoReset(message_to_gui)
 
@@ -134,11 +126,6 @@ class TicTacToe:
     def loadNewPlayer(self, new_player, index=1):
         self.players[index] = new_player
         self.initiatePlayers()
-
-    def play(self):
-        if not self.activeplayer.isHuman():
-            self.queryNonHumanPlayer()
-            self.reset()
 
     def getResults(self, result):
         self.battleresults.append(result)
@@ -162,7 +149,6 @@ class TicTacToe:
             draws.append(draws[-1])
             self.battleresults = []
 
-        #print(self.player1wins, self.player2wins, self.draws)
         mostwins = 0
         totalwins = 0
         bestplayer = None
@@ -171,8 +157,8 @@ class TicTacToe:
                 mostwins = player.wins
                 bestplayer = player
                 totalwins += player.wins / number_of_rounds / number_of_battles
-            print("{}: {} games won.".format(player.name, player.wins / number_of_rounds / number_of_battles))
-        print("{} games ended in draw.".format(number_of_rounds*number_of_battles - totalwins))
+            #print("{}: {} games won.".format(player.name, player.wins / number_of_rounds / number_of_battles))
+        #print("{} games ended in draw.".format(number_of_rounds*number_of_battles - totalwins))
         bestplayer.savePolicy()
         return gamecount, player1wins, player2wins, draws
 
