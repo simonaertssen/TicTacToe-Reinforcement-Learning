@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import torch
 import random
 import pickle
@@ -27,6 +28,9 @@ class BasicPlayer:
         board[move] = self.symbol
         self.signalMovePlayed(move)
         return board
+
+    def getBoardState(self, board):
+        return str(board.flatten().tolist())
 
     def chooseMove(self, possible_moves, board):
         raise NotImplementedError
@@ -191,6 +195,95 @@ class AlphaBetaPlayer(MiniMaxPlayer):
             return bestscore
 
 
+class TrainedAlphaBetaPlayer(MiniMaxPlayer):
+    # This class was made to only perform the tree search once, as to speed up any testing using a minimax player.
+    # The best move in all situations are saved in a dictionary
+    def __init__(self, name):
+        super(TrainedAlphaBetaPlayer, self).__init__(name)
+        self.alpha = - np.Inf
+        self.beta = np.Inf
+        if os.path.isfile("trained{}.pickle".format(self.__class__.__name__)):
+            self.loadPolicy()
+        else:
+            self.initplayermoves = {}
+            self.contraplayermoves = {}
+
+    def getWeights(self):
+        return (self.initplayermoves, self.contraplayermoves)
+
+    def setWeights(self, weights):
+        self.initplayermoves, self.contraplayermoves = weights
+
+    def bestMoveIsKnown(self, board):
+        for rotation in range(4):
+            rotatedboard = np.rot90(board, k=rotation)
+            print(rotatedboard)
+
+            maindiagonalflipboard = rotatedboard.T
+            print(maindiagonalflipboard)
+
+            offdiagonalflipboard = rotatedboard[::-1, ::-1].T
+            print(offdiagonalflipboard)
+
+    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth):
+        if depth > self._maxdepth:
+            return 0
+        ismaximising = self.maximising(playersymbol)
+        if didPlayerWinAccordingToTheRules(board, playersymbol):
+            if ismaximising:
+                if depth == 0:
+                    return 0
+                else:
+                    return 1
+            else:
+                if depth == 0:
+                    return 0
+                else:
+                    return -1
+        elif not (board == 0).any():
+            return 0
+
+        alternative_moves = moves.copy()
+        alternative_board = board.copy()
+
+        bestscore = - np.Inf if ismaximising else np.Inf
+        bestscoreindex = None
+
+        for index, move in enumerate(moves):
+            alternative_moves.remove(move)
+            alternative_board[move] = playersymbol
+
+            score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1)
+            if ismaximising:
+                if score > bestscore:
+                    bestscore = score
+                    bestscoreindex = index
+                if bestscore >= self.beta:
+                    if depth == 0:
+                        return bestscoreindex
+                    else:
+                        return bestscore
+                self.alpha = max(bestscore, self.alpha)
+            else:
+                if score < bestscore:
+                    bestscore = score
+                    bestscoreindex = index
+                if bestscore <= self.alpha:
+                    if depth == 0:
+                        return bestscoreindex
+                    else:
+                        return bestscore
+                self.beta = min(bestscore, self.beta)
+
+            alternative_moves.append(move)
+            alternative_board[move] = 0
+
+        if depth == 0:
+            return bestscoreindex
+        else:
+            return bestscore
+
+
 class ValuePlayer(BasicPlayer):
     def __init__(self, name):
         super(ValuePlayer, self).__init__(name)
@@ -203,9 +296,6 @@ class ValuePlayer(BasicPlayer):
         self._boardstates = []
         self._boardvalues = []
         self._trainable = True
-
-    def getBoardState(self, board):
-        return str(board.flatten().tolist())
 
     def chooseMove(self, possible_moves, board):
         if np.random.rand(1) <= self._explore and self._trainable:
