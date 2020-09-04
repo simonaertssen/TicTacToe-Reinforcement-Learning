@@ -187,7 +187,7 @@ class AlphaBetaPlayer(MiniMaxPlayer):
 
 
 class QPlayer(BasicPlayer):
-    def __init__(self, lr, decay, exploration):
+    def __init__(self, lr=0.9, decay=0.95, exploration=0.3):
         super(QPlayer, self).__init__()
         self.wins = 0
 
@@ -195,8 +195,7 @@ class QPlayer(BasicPlayer):
         self._decay = decay
         self._explore = exploration
         self._playedmoves = []
-        self._boardstates = []
-        self._boardvalues = []
+        self._boardpolicy = {}
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
@@ -209,11 +208,8 @@ class QPlayer(BasicPlayer):
             for possible_move in possible_moves:
                 alternative_board[possible_move] = self.symbol
                 boardstate = self.getBoardState(alternative_board)
-                if boardstate in self._boardstates:
-                    index = self._boardstates.index(boardstate)
-                    value_of_action = self._boardvalues[index]
-                else:
-                    value_of_action = 0
+
+                value_of_action = self._boardpolicy.get(boardstate, 0)
 
                 if value_of_action > value_of_action_max:
                     value_of_action_max = value_of_action
@@ -222,30 +218,26 @@ class QPlayer(BasicPlayer):
                 alternative_board[possible_move] = 0
 
             self._playedmoves.append(bestboardstate)
-            if bestboardstate not in self._boardstates:
-                self._boardstates.append(bestboardstate)
-                valueOfMoveToBeDetermined = 0
-                self._boardvalues.append(valueOfMoveToBeDetermined)
+            if bestboardstate not in self._boardpolicy:
+                self._boardpolicy[bestboardstate] = 0.0
         return move
 
     def reward(self, prize):
         if not self._trainable:
             return
         for move in reversed(self._playedmoves):
-            boardstateindex = self._boardstates.index(move)
-            value = self._boardvalues[boardstateindex]
+            value = self._boardpolicy[move]
             value += self._lr * (self._decay * prize - value)
-            prize = value
-            self._boardvalues[boardstateindex] = value
+            self._boardpolicy[move] = prize = value
 
     def reset(self):
         self._playedmoves = []
 
     def getWeights(self):
-        return (self._boardstates, self._boardvalues)
+        return self._boardpolicy
 
     def setWeights(self, weights):
-        self._boardstates, self._boardvalues = weights
+        self._boardpolicy = weights
 
 
 class NeuralPlayerBrain(torch.nn.Module):
