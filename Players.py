@@ -186,9 +186,9 @@ class AlphaBetaPlayer(MiniMaxPlayer):
             return bestscore
 
 
-class ValuePlayer(BasicPlayer):
+class QPlayer(BasicPlayer):
     def __init__(self, lr, decay, exploration):
-        super(ValuePlayer, self).__init__()
+        super(QPlayer, self).__init__()
         self.wins = 0
 
         self._lr = lr
