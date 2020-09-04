@@ -37,7 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         # Variables:
-        self.game = Game.TicTacToe(Players.HumanPlayer("Human"), Players.ValuePlayer("Bot"))
+        self.game = Game.TicTacToe(Players.HumanPlayer(), Players.AlphaBetaPlayer())
         self.game.returnMoveToGUI = self.drawMoveOnBoard
         self.game.signalGUItoReset = self.informUserGameEnded
 
@@ -70,7 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for player in playerClasses:
             self.choosePlayerComboBox.addItem(player)
             self.choosePlayerComboBox.setMinimumSize(QtCore.QSize(buttonWidth, 8))
-        self.choosePlayerComboBox.setCurrentIndex(4)
+        self.choosePlayerComboBox.setCurrentIndex(6)
         self.choosePlayerComboBox.activated.connect(self.loadNewPlayer)
         self.grid.addWidget(self.choosePlayerComboBox, 0, 1)
 
@@ -107,15 +107,17 @@ class MainWindow(QtWidgets.QMainWindow):
             if isinstance(widget, TicTacToeButton):
                 widget.setEnabled(True)
                 widget.setText("")
+        if self.game.gameIsBusy():
+            self.game.reset()
         self.game.play()
 
 
     def loadNewPlayer(self, boxIndex):
         self.reset()
-        newPLayeName = self.choosePlayerComboBox.itemText(boxIndex)
-        print("Loading player {}".format(newPLayeName))
-        newPlayer = getattr(Players, newPLayeName)
-        newPlayer = newPlayer(newPLayeName)
+        newPLayerName = self.choosePlayerComboBox.itemText(boxIndex)
+        print("Loading player {}".format(newPLayerName))
+        newPlayer = getattr(Players, newPLayerName)
+        newPlayer = newPlayer()
         newPlayer.loadPolicy()
         self.game.loadNewPlayer(newPlayer)
 
