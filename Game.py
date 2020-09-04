@@ -27,8 +27,8 @@ class TicTacToe:
 
         self._reward_win  = 1.0
         self._reward_lose = -1.0
-        self._reward_draw = 0.8
-        self._reward_draw_opponent = 0.2
+        self._reward_draw = 0.5
+        self._reward_draw_opponent = 0.5
 
         self._gameStarted = False
         self._gameEnded = False

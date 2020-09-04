@@ -37,7 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         # Variables:
-        self.game = Game.TicTacToe(Players.HumanPlayer(), Players.AlphaBetaPlayer())
+        self.game = Game.TicTacToe(Players.HumanPlayer(), Players.QPlayer())
         self.game.returnMoveToGUI = self.drawMoveOnBoard
         self.game.signalGUItoReset = self.informUserGameEnded
 
@@ -118,6 +118,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print("Loading player {}".format(newPLayerName))
         newPlayer = getattr(Players, newPLayerName)
         newPlayer = newPlayer()
+        newPlayer._trainable = False
         newPlayer.loadPolicy()
         self.game.loadNewPlayer(newPlayer)
 
