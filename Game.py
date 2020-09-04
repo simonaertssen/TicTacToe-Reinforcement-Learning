@@ -27,8 +27,8 @@ class TicTacToe:
 
         self._reward_win  = 1.0
         self._reward_lose = -1.0
-        self._reward_draw = 0.2
-        self._reward_draw_opponent = 0.5
+        self._reward_draw = 0.8
+        self._reward_draw_opponent = 0.2
 
         self._gameStarted = False
         self._gameEnded = False
@@ -87,11 +87,11 @@ class TicTacToe:
             raise ValueError
 
     def processPlayerMove(self, move):
-        print(self.board)
         self.returnMoveToGUI(move, self.activeplayerindex)
         if self.didTheCurrentPlayerWin():
             self.activeplayer.wins += 1
             self.activeplayer.reward(self._reward_win)
+            self.players[(self.activeplayerindex+1)%2].reward(self._reward_lose)
             # message = "Player {} won the game.".format(self.activeplayer.name)
             message = self.activeplayer.symbol
             self.stop(message)
@@ -116,8 +116,8 @@ class TicTacToe:
         self.signalGUItoReset(message_to_gui)
 
     def reset(self):
-        self.board.fill(0)# = np.zeros((self._rows, self._cols))
-        print("reset\n", self.board)
+        # Filling the board with zeros is safer than making a new instance of an np array.
+        self.board.fill(0)
         self._gameStarted = False
         self._gameEnded = False
         self._currentmove = 0
@@ -133,7 +133,7 @@ class TicTacToe:
         self.battleresults.append(result)
 
     def train(self, number_of_rounds=100, number_of_battles=100):
-        self._verbose = True
+        self._verbose = False
         self.battleresults = []
         self.signalGUItoReset = self.getResults
 
@@ -151,24 +151,10 @@ class TicTacToe:
             draws.append(draws[-1])
             self.battleresults = []
 
-        mostwins = 0
-        totalwins = 0
-        bestplayer = None
-        for player in self.players:
-            if player.wins >= mostwins:
-                mostwins = player.wins
-                bestplayer = player
-                totalwins += player.wins / number_of_rounds / number_of_battles
-            #print("{}: {} games won.".format(player.name, player.wins / number_of_rounds / number_of_battles))
-        #print("{} games ended in draw.".format(number_of_rounds*number_of_battles - totalwins))
-        bestplayer.savePolicy()
         return gamecount, player1wins, player2wins, draws
 
-    def test(self, number_of_rounds=100):
+    def test(self, number_of_rounds=100, number_of_battles=100):
+        self._verbose = False
         for player in self.players:
             player._trainable = False
-        for round in tqdm.tqdm(range(number_of_rounds)):
-            self.play()
-        for player in self.players:
-            print("{}: {} games won.".format(player.name, player.wins / number_of_rounds))
-        print("{} games ended in draw.".format((number_of_rounds*number_of_battles - self.players[0].wins - self.players[1].wins)/number_of_rounds))
+        return self.train(number_of_rounds, number_of_battles)

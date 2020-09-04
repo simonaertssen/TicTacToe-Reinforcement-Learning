@@ -8,17 +8,17 @@ import tqdm
 from Game import didPlayerWinAccordingToTheRules
 
 class BasicPlayer:
-    def __init__(self, name=None, symbol=None):
-        self.name = name
+    def __init__(self, symbol=None):
+        self.name = self.__class__.__name__
         self.symbol = symbol
         self._human = False
         self.wins = 0
         self._trainable = False
         self._verbose = True
-        self._savepath = "trained{}.pickle".format(self.__class__.__name__)
+        self._savepath = "trained{}.pickle".format(self.name)
 
     def __repr__(self):
-        return "Player {}: {}".format(self.name, self.symbol)
+        return "{}: {}".format(self.name, self.symbol)
 
     def isHuman(self):
         return self._human
@@ -66,16 +66,16 @@ class BasicPlayer:
 
 
 class RandomPlayer(BasicPlayer):
-    def __init__(self, name):
-        super(RandomPlayer, self).__init__(name)
+    def __init__(self):
+        super(RandomPlayer, self).__init__()
 
     def chooseMove(self, possible_moves, board):
         return random.choice(possible_moves)
 
 
 class HumanPlayer(BasicPlayer):
-    def __init__(self, name):
-        super(HumanPlayer, self).__init__(name)
+    def __init__(self):
+        super(HumanPlayer, self).__init__()
         self._human = True
 
     def playMove(self, move, board):
@@ -88,32 +88,35 @@ class HumanPlayer(BasicPlayer):
 
 
 class MiniMaxPlayer(BasicPlayer):
-    def __init__(self, name):
-        super(MiniMaxPlayer, self).__init__(name)
+    def __init__(self):
+        super(MiniMaxPlayer, self).__init__()
         self._maxdepth = 100
 
     def maximising(self, symbol):
         return symbol == self.symbol
 
     def chooseMove(self, possible_moves, board):
-        best_score_index = self.rateMovesThroughMiniMax(possible_moves, board, self.symbol, 0)
+        best_score_index = self.rateMovesThroughMiniMax(possible_moves, board, self.symbol)
         return possible_moves[best_score_index]
 
     def switchPlayerSymbol(self, symbol):
         return 1 if symbol == -1 else -1
 
-    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth):
+    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0):
         if depth > self._maxdepth:
             return [0]
         alternative_moves = moves.copy()
         alternative_board = board.copy()
 
+        ismaximising = self.maximising(playersymbol)
+
         scores = []
         for move in moves:
             alternative_moves.remove(move)
             alternative_board[move] = playersymbol
+
             if didPlayerWinAccordingToTheRules(alternative_board, playersymbol):
-                score = 1 if self.maximising(playersymbol) else -1
+                score = 1 if ismaximising else -1
             elif not (alternative_board == 0).any():
                 score = 0
             else:
@@ -122,158 +125,57 @@ class MiniMaxPlayer(BasicPlayer):
             alternative_moves.append(move)
             alternative_board[move] = 0
 
-        decisivescore = max(scores) if self.maximising(playersymbol) else min(scores)
+        decisivescore = max(scores) if ismaximising else min(scores)
         if depth == 0:
+            print("scores =", scores, "bestscoreindex =", scores.index(decisivescore))
             return scores.index(decisivescore)
         else:
             return decisivescore
 
 
 class AlphaBetaPlayer(MiniMaxPlayer):
-    def __init__(self, name):
-        super(AlphaBetaPlayer, self).__init__(name)
-        self.alpha = - np.Inf
-        self.beta = np.Inf
+    def __init__(self):
+        super(AlphaBetaPlayer, self).__init__()
 
-    # This function became a lot larger than expected, due to the double types of return statements (for single depth we only want the index of the best move)
-    # and due to combining maximising and minimising in one statement.
-    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth):
+    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0, alpha=-np.Inf, beta=np.Inf):
         if depth > self._maxdepth:
-            return 0
-        ismaximising = self.maximising(playersymbol)
-        if didPlayerWinAccordingToTheRules(board, playersymbol):
-            if ismaximising:
-                if depth == 0:
-                    return 0
-                else:
-                    return 1
-            else:
-                if depth == 0:
-                    return 0
-                else:
-                    return -1
-        elif not (board == 0).any():
-            return 0
+            return [0]
+        printing = False
+        if len(moves) < 3 and depth < 3:
+            printing = True
 
         alternative_moves = moves.copy()
         alternative_board = board.copy()
 
-        bestscore = - np.Inf if ismaximising else np.Inf
-        bestscoreindex = None
-
-        for index, move in enumerate(moves):
-            alternative_moves.remove(move)
-            alternative_board[move] = playersymbol
-            score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1)
-            if ismaximising:
-                if score > bestscore:
-                    bestscore = score
-                    bestscoreindex = index
-                if bestscore >= self.beta:
-                    if depth == 0:
-                        return bestscoreindex
-                    else:
-                        return bestscore
-                self.alpha = max(bestscore, self.alpha)
-            else:
-                if score < bestscore:
-                    bestscore = score
-                    bestscoreindex = index
-                if bestscore <= self.alpha:
-                    if depth == 0:
-                        return bestscoreindex
-                    else:
-                        return bestscore
-                self.beta = min(bestscore, self.beta)
-
-            alternative_moves.append(move)
-            alternative_board[move] = 0
-
-        if depth == 0:
-            return bestscoreindex
-        else:
-            return bestscore
-
-
-class TrainedAlphaBetaPlayer(MiniMaxPlayer):
-    # This class was made to only perform the tree search once, as to speed up any testing using a minimax player.
-    # The best move in all situations are saved in a dictionary
-    def __init__(self, name):
-        super(TrainedAlphaBetaPlayer, self).__init__(name)
-        self.alpha = - np.Inf
-        self.beta = np.Inf
-        if os.path.isfile("trained{}.pickle".format(self.__class__.__name__)):
-            self.loadPolicy()
-        else:
-            self.initplayermoves = {}
-            self.contraplayermoves = {}
-
-    def getWeights(self):
-        return (self.initplayermoves, self.contraplayermoves)
-
-    def setWeights(self, weights):
-        self.initplayermoves, self.contraplayermoves = weights
-
-    def bestMoveIsKnown(self, board):
-        for rotation in range(4):
-            rotatedboard = np.rot90(board, k=rotation)
-            print(rotatedboard)
-
-            maindiagonalflipboard = rotatedboard.T
-            print(maindiagonalflipboard)
-
-            offdiagonalflipboard = rotatedboard[::-1, ::-1].T
-            print(offdiagonalflipboard)
-
-    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth):
-        if depth > self._maxdepth:
-            return 0
         ismaximising = self.maximising(playersymbol)
-        if didPlayerWinAccordingToTheRules(board, playersymbol):
-            if ismaximising:
-                if depth == 0:
-                    return 0
-                else:
-                    return 1
-            else:
-                if depth == 0:
-                    return 0
-                else:
-                    return -1
-        elif not (board == 0).any():
-            return 0
-
-        alternative_moves = moves.copy()
-        alternative_board = board.copy()
-
         bestscore = - np.Inf if ismaximising else np.Inf
-        bestscoreindex = None
+        bestscoreindex = 0
 
         for index, move in enumerate(moves):
             alternative_moves.remove(move)
             alternative_board[move] = playersymbol
 
-            score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1)
+            if didPlayerWinAccordingToTheRules(alternative_board, playersymbol):
+                score = 1 if ismaximising else -1
+            elif not (alternative_board == 0).any():
+                score = 0
+            else:
+                score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1, alpha, beta)
+
             if ismaximising:
                 if score > bestscore:
                     bestscore = score
                     bestscoreindex = index
-                if bestscore >= self.beta:
-                    if depth == 0:
-                        return bestscoreindex
-                    else:
-                        return bestscore
-                self.alpha = max(bestscore, self.alpha)
+                if bestscore >= beta:
+                    return bestscore
+                alpha = max(bestscore, alpha)
             else:
                 if score < bestscore:
                     bestscore = score
                     bestscoreindex = index
-                if bestscore <= self.alpha:
-                    if depth == 0:
-                        return bestscoreindex
-                    else:
-                        return bestscore
-                self.beta = min(bestscore, self.beta)
+                if bestscore <= alpha:
+                    return bestscore
+                beta = min(bestscore, beta)
 
             alternative_moves.append(move)
             alternative_board[move] = 0
@@ -285,12 +187,12 @@ class TrainedAlphaBetaPlayer(MiniMaxPlayer):
 
 
 class ValuePlayer(BasicPlayer):
-    def __init__(self, name):
-        super(ValuePlayer, self).__init__(name)
+    def __init__(self):
+        super(ValuePlayer, self).__init__()
         self.wins = 0
 
-        self._lr = 0.1
-        self._decay = 0.9
+        self._lr = 0.5
+        self._decay = 0.95
         self._explore = 0.3
         self._playedmoves = []
         self._boardstates = []
@@ -373,8 +275,8 @@ class NeuralPlayerBrain(torch.nn.Module):
 
 
 class NeuralPlayer(BasicPlayer):
-    def __init__(self, name):
-        super(NeuralPlayer, self).__init__(name)
+    def __init__(self):
+        super(NeuralPlayer, self).__init__()
         self._brain = NeuralPlayerBrain()
         self._trainable = True
 
