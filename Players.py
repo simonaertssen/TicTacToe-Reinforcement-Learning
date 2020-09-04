@@ -187,13 +187,13 @@ class AlphaBetaPlayer(MiniMaxPlayer):
 
 
 class ValuePlayer(BasicPlayer):
-    def __init__(self):
+    def __init__(self, lr, decay, exploration):
         super(ValuePlayer, self).__init__()
         self.wins = 0
 
-        self._lr = 0.5
-        self._decay = 0.95
-        self._explore = 0.3
+        self._lr = lr
+        self._decay = decay
+        self._explore = exploration
         self._playedmoves = []
         self._boardstates = []
         self._boardvalues = []
