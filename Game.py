@@ -21,7 +21,7 @@ class TicTacToe:
         self._startplayer = 0
 
         self._rows = self._cols = 3
-        self.board = np.zeros((self._rows, self._cols))
+        self.board = np.zeros((self._rows, self._cols)).astype(np.int8)
         self._max_moves = self._rows * self._cols
         self._currentmove = 0
 
@@ -118,6 +118,7 @@ class TicTacToe:
     def reset(self):
         # Filling the board with zeros is safer than making a new instance of an np array.
         self.board.fill(0)
+        self.board.astype(np.int8)
         self._gameStarted = False
         self._gameEnded = False
         self._currentmove = 0
