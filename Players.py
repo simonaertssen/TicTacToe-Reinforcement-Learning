@@ -187,23 +187,23 @@ class AlphaBetaPlayer(MiniMaxPlayer):
 
 
 class QPlayer(BasicPlayer):
-    def __init__(self, lr=0.9, decay=0.95, exploration=0.3):
+    def __init__(self, lr=0.9, lrdecay=0.95, exploration=0.3, explorationdecay=1.0):
         super(QPlayer, self).__init__()
         self.wins = 0
 
         self._lr = lr
-        self._decay = decay
+        self._lrdecay = lrdecay
         self._explore = exploration
+        self._exploredecay = explorationdecay
         self._playedmoves = []
         self._boardpolicy = {}
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        if np.random.rand(1) <= self._explore and self._trainable:
+        if self._trainable and np.random.rand(1) <= self._explore:
             move = random.choice(possible_moves)
         else:
             value_of_action_max = - np.Inf
-            bestboardstate = None
             alternative_board = board.copy()
             for possible_move in possible_moves:
                 alternative_board[possible_move] = self.symbol
@@ -211,7 +211,7 @@ class QPlayer(BasicPlayer):
 
                 value_of_action = self._boardpolicy.get(boardstate, 0)
 
-                if value_of_action > value_of_action_max:
+                if value_of_action >= value_of_action_max:
                     value_of_action_max = value_of_action
                     move = possible_move
                     bestboardstate = boardstate
@@ -227,8 +227,9 @@ class QPlayer(BasicPlayer):
             return
         for move in reversed(self._playedmoves):
             value = self._boardpolicy[move]
-            value += self._lr * (self._decay * prize - value)
+            value += self._lr * (self._lrdecay * prize - value)
             self._boardpolicy[move] = prize = value
+        self._explore *= self._exploredecay
 
     def reset(self):
         self._playedmoves = []
@@ -243,57 +244,73 @@ class QPlayer(BasicPlayer):
 class NeuralPlayerBrain(torch.nn.Module):
     def __init__(self):
         super(NeuralPlayerBrain, self).__init__()
-        self.inputdims  = [9, 9*9, 9]
-        self.layers     = torch.nn.ModuleList()
-        self.layercount = len(self.inputdims) - 1
-        self.batchnorm  = torch.nn.BatchNorm1d(self.inputdims[0])
-        self.dropout    = torch.nn.Dropout(p=0.3)
-        self.dropoutidx = 1
-        self.activation = torch.nn.LeakyReLU(0.2)
-        self.lr         = 0.02
+        self._inputdims  = [9, 9*9, 9]
+        self._layers     = torch.nn.ModuleList()
+        self._layercount = len(self._inputdims) - 1
+        self._batchnorm  = torch.nn.BatchNorm1d(self.inputdims[0])
+        self._dropout    = torch.nn.Dropout(p=0.3)
+        self._dropoutidx = 1
+        self._activation = torch.nn.ReLU()
 
-        for i, layer in enumerate(range(self.layercount)):
-            layer_to_add = torch.nn.Linear(self.inputdims[i], self.inputdims[i+1])
+        for i, layer in enumerate(range(self._layercount)):
+            layer_to_add = torch.nn.Linear(self._inputdims[i], self._inputdims[i+1])
             torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
-            self.layers.append(layer_to_add)
+            self._layers.append(layer_to_add)
 
     def forward(self, x):
-        x = self.batchnorm(x)
-        for layer_index in range(self.layercount - 1):
-            if layer_index == self.dropoutidx:
-                x = self.dropout(x)
-            x = self.activation(self.layers[layer_index](x))
-        return self.layers[-1](x)
+        x = self._batchnorm(x)
+        for layer_index in range(self._layercount - 1):
+            if layer_index == self._dropoutidx:
+                x = self._dropout(x)
+            x = self._activation(self._layers[layer_index](x))
+        return torch.sigmoid(self._layers[-1](x))
 
 
 class NeuralPlayer(BasicPlayer):
     def __init__(self):
         super(NeuralPlayer, self).__init__()
-        self._brain = NeuralPlayerBrain()
+        self._activebrain = NeuralPlayerBrain()
+        self._learningbrain = NeuralPlayerBrain()
+        self._lr = 0.1
+        self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
+        self._loss = torch.nn.MSELoss()
+
+        self._playedmoves = []
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        bestactionvalue = - float("Inf")
-        board = torch.from_numpy(board)
-        alternative_board = board.clone()
-        for i, possible_move in enumerate(possible_moves):
-            alternative_board[possible_move] = self.symbol
-            value = self._brain(alternative_board.flatten())
-            if value > bestactionvalue:
-                bestactionvalue = value
-                move = possible_move
-            alternative_board[possible_move] = 0
+        actionvalues = self._brain(torch.from_numpy(board).flatten())
+        possible_actionvalues = [actionvalues[move].item() for move in possible_moves]
+        index, max_actionvalues = max(possible_actionvalues, key=lambda x: x[1])
+        move = possible_moves[index]
+        self._playedmoves.append(move)
         return move
 
     def reward(self, prize):
         if not self._trainable:
             return
+
+        self.backpropagate()
         for move in reversed(self._playedmoves):
             boardstateindex = self._boardstates.index(move)
             value = self._boardvalues[boardstateindex]
             value += self._lr * (self._decay * prize - value)
             prize = value
             self._boardvalues[boardstateindex] = value
+
+    def backpropagate(net_context, position, move_index, target_value):
+        self._optimizer.zero_grad()
+        output = net_context.policy_net(convert_to_tensor(position))
+
+        target = output.clone().detach()
+        target[move_index] = target_value
+        illegal_move_indexes = position.get_illegal_move_indexes()
+        for mi in illegal_move_indexes:
+            target[mi] = LOSS_VALUE
+
+        loss = net_context.loss_function(output, target)
+        loss.backward()
+        net_context.optimizer.step()
 
     def reset(self):
         self._playedmoves = []
