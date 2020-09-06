@@ -267,11 +267,12 @@ class NeuralPlayerBrain(torch.nn.Module):
 
 
 class NeuralPlayer(BasicPlayer):
-    def __init__(self):
+    def __init__(self, lr=0.1, discount=0.99):
         super(NeuralPlayer, self).__init__()
-        self._activebrain = NeuralPlayerBrain()
-        self._learningbrain = NeuralPlayerBrain()
-        self._lr = 0.1
+        self._activebrain = NeuralPlayerBrain()   # = target_net
+        self._learningbrain = NeuralPlayerBrain() # = policy_net
+        self._lr = lr
+        self._discount = discount
         self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
         self._loss = torch.nn.MSELoss()
 
@@ -279,43 +280,45 @@ class NeuralPlayer(BasicPlayer):
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        actionvalues = self._activebrain(torch.from_numpy(board).flatten())
+        torchboard = torch.from_numpy(board).flatten().type(torch.int8)
+        actionvalues = self._activebrain(torchboard)
         possible_actionvalues = [actionvalues[move].item() for move in possible_moves]
         index, max_actionvalues = max(possible_actionvalues, key=lambda x: x[1])
         move = possible_moves[index]
-        self._playedmoves.append(move)
+        self._playedmoves.append((board, move))
         return move
 
     def reward(self, prize):
         if not self._trainable:
             return
+        for i, (board, move) in enumerate(reversed(self._playedmoves)):
+            if i != 0:
+                with torch.no_grad():
+                    torchboard = torch.from_numpy(board).flatten().type(torch.int8)
+                    actionvalues = self._activebrain(torchboard)
+                    maxvalue = torch.max(actionvalues).item()
+                    prize = self._discount * maxvalue
+            self.backpropagate(board, move, prize)
+        self._activebrain.load_state_dict(self._learningbrain.state_dict())
 
-        for move in reversed(self._playedmoves):
-            boardstateindex = self._boardstates.index(move)
-            value = self._boardvalues[boardstateindex]
-            value += self._lr * (self._decay * prize - value)
-            prize = value
-            self._boardvalues[boardstateindex] = value
-
-    def backpropagate(net_context, position, move_index, target_value):
+    def backpropagate(playedboard, playedmove, prize):
         self._optimizer.zero_grad()
-        output = net_context.policy_net(convert_to_tensor(position))
+        torchboard = torch.from_numpy(playedboard).flatten().type(torch.int8)
+        actionvalues = self._learningbrain(torchboard)
 
-        target = output.clone().detach()
-        target[move_index] = target_value
-        illegal_move_indexes = position.get_illegal_move_indexes()
-        for mi in illegal_move_indexes:
-            target[mi] = LOSS_VALUE
+        targets = actionvalues.clone().detach()
+        target[playedmove] = prize
+        target[playedboard == 0] = 0
 
-        loss = net_context.loss_function(output, target)
+        loss = self._loss(actionvalues, targets)
         loss.backward()
-        net_context.optimizer.step()
+        self._optimizer.step()
 
     def reset(self):
         self._playedmoves = []
 
     def getWeights(self):
-        return (self._boardstates, self._boardvalues)
+        return self._activebrain.state_dict()
 
     def setWeights(self, weights):
-        self._boardstates, self._boardvalues = weights
+        self._activebrain.load_state_dict(weights)
