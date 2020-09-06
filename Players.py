@@ -187,7 +187,7 @@ class AlphaBetaPlayer(MiniMaxPlayer):
 
 
 class QPlayer(BasicPlayer):
-    def __init__(self, lr=0.9, lrdecay=0.95, exploration=0.3, explorationdecay=1.0):
+    def __init__(self, lr=0.5, lrdecay=0.99, exploration=0.3, explorationdecay=0.95):
         super(QPlayer, self).__init__()
         self.wins = 0
 
@@ -279,7 +279,7 @@ class NeuralPlayer(BasicPlayer):
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        actionvalues = self._brain(torch.from_numpy(board).flatten())
+        actionvalues = self._activebrain(torch.from_numpy(board).flatten())
         possible_actionvalues = [actionvalues[move].item() for move in possible_moves]
         index, max_actionvalues = max(possible_actionvalues, key=lambda x: x[1])
         move = possible_moves[index]
@@ -290,7 +290,6 @@ class NeuralPlayer(BasicPlayer):
         if not self._trainable:
             return
 
-        self.backpropagate()
         for move in reversed(self._playedmoves):
             boardstateindex = self._boardstates.index(move)
             value = self._boardvalues[boardstateindex]
