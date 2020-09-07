@@ -6,7 +6,6 @@ import tqdm
 import numpy as np
 from np.random import rand
 
-from numba import jit, njit
 from random import choice
 from Game import didPlayerWinAccordingToTheRules
 
@@ -96,7 +95,7 @@ class MiniMaxPlayer(BasicPlayer):
         self._maxdepth = 100
 
     def chooseMove(self, possible_moves, board):
-        best_score_index = self.rateMovesThroughMiniMax(possible_moves.copy(), board.copy(), self.symbol)
+        best_score_index = self.rateMovesThroughMiniMax(possible_moves, board, self.symbol)
         return possible_moves[best_score_index]
 
     def switchPlayerSymbol(self, symbol):
@@ -107,21 +106,24 @@ class MiniMaxPlayer(BasicPlayer):
             return [0]
 
         ismaximising = playersymbol == self.symbol
+        alternate_moves = moves.copy()
+        alternate_board = board.copy()
 
         scores = []
-        for move in moves:
-            moves.remove(move)
-            board[move] = playersymbol
+        for index, move in enumerate(moves):
+            alternate_moves.remove(move)
+            alternate_board[move] = playersymbol
 
-            if didPlayerWinAccordingToTheRules(board, playersymbol):
+            if didPlayerWinAccordingToTheRules(alternate_board, playersymbol):
                 score = 1 if ismaximising else -1
-            elif not (board == 0).any():
+            elif not (alternate_board == 0).any():
                 score = 0
             else:
-                score = self.rateMovesThroughMiniMax(moves, board, self.switchPlayerSymbol(playersymbol), depth + 1)
+                score = self.rateMovesThroughMiniMax(alternate_moves, alternate_board, self.switchPlayerSymbol(playersymbol), depth + 1)
             scores.append(score)
-            moves.append(move)
-            board[move] = 0
+
+            alternate_moves.insert(index, move)
+            alternate_board[move] = 0
 
         decisivescore = max(scores) if ismaximising else min(scores)
         if depth == 0:
@@ -142,16 +144,19 @@ class AlphaBetaPlayer(MiniMaxPlayer):
         bestscore = - np.Inf if ismaximising else np.Inf
         bestscoreindex = 0
 
-        for index, move in enumerate(moves):
-            moves.remove(move)
-            board[move] = playersymbol
+        alternate_moves = moves.copy()
+        alternate_board = board.copy()
 
-            if didPlayerWinAccordingToTheRules(board, playersymbol):
+        for index, move in enumerate(moves):
+            alternate_moves.remove(move)
+            alternate_board[move] = playersymbol
+
+            if didPlayerWinAccordingToTheRules(alternate_board, playersymbol):
                 score = 1 if ismaximising else -1
-            elif not (board == 0).any():
+            elif not (alternate_board == 0).any():
                 score = 0
             else:
-                score = self.rateMovesThroughMiniMax(moves, board, self.switchPlayerSymbol(playersymbol), depth + 1, alpha, beta)
+                score = self.rateMovesThroughMiniMax(alternate_moves, alternate_board, self.switchPlayerSymbol(playersymbol), depth + 1, alpha, beta)
 
             if ismaximising:
                 if score > bestscore:
@@ -168,8 +173,8 @@ class AlphaBetaPlayer(MiniMaxPlayer):
                     return bestscore
                 beta = min(bestscore, beta)
 
-            moves.append(move)
-            board[move] = 0
+            alternate_moves.append(move)
+            alternate_board[move] = 0
 
         if depth == 0:
             return bestscoreindex
