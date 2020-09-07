@@ -58,19 +58,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.newGameButton.clicked.connect(self.reset)
         self.grid.addWidget(self.newGameButton, 0, 0)
 
-        # Train the players
-        self.trainButton = QtWidgets.QPushButton("Train")
-        self.trainButton.setMinimumSize(QtCore.QSize(buttonWidth, 8))
-        self.trainButton.clicked.connect(self.train)
-        self.grid.addWidget(self.trainButton, 0, 2)
-
         # Find all player classes:
         playerClasses = [x for x in dir(Players) if isclass(getattr(Players, x)) and 'Player' in x and 'Basic' not in x and 'Brain' not in x]
         self.choosePlayerComboBox = QtWidgets.QComboBox()
         for player in playerClasses:
             self.choosePlayerComboBox.addItem(player)
             self.choosePlayerComboBox.setMinimumSize(QtCore.QSize(buttonWidth, 8))
-        self.choosePlayerComboBox.setCurrentIndex(6)
+        self.choosePlayerComboBox.setCurrentIndex(0)
         self.choosePlayerComboBox.activated.connect(self.loadNewPlayer)
         self.grid.addWidget(self.choosePlayerComboBox, 0, 1)
 
@@ -87,7 +81,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.close()
 
     def drawMoveOnBoard(self, newmove, playerindex):
-        self.grid.itemAt(newmove[0]*self.grid.columnCount() + newmove[1] + 3).widget().mark(playerindex)
+        self.grid.itemAt(newmove[0]*self.grid.columnCount() + newmove[1] + 2).widget().mark(playerindex)
 
     def informUserGameEnded(self, result):
         info = QtWidgets.QMessageBox()
@@ -121,14 +115,6 @@ class MainWindow(QtWidgets.QMainWindow):
         newPlayer._trainable = False
         newPlayer.loadPolicy()
         self.game.loadNewPlayer(newPlayer)
-
-    def train(self, rounds=1000):
-        self.game.play()
-        self.game.train(rounds)
-
-    def test(self):
-        self.game.play()
-        self.game.test()
 
 
 app = QtWidgets.QApplication(sys.argv)
