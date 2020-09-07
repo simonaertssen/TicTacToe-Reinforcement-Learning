@@ -7,7 +7,7 @@ def didPlayerWinAccordingToTheRules(board, player_symbol):
     score = 3 * player_symbol
     if any(board.sum(0) == score) or any(board.sum(1) == score):
         return True
-    if board.diagonal().sum() == score or np.flip(board,1).diagonal().sum() == score:
+    if board.diagonal().sum() == score or (board[2,0] + board[1,1] + board[0,2]) == score:
         return True
     return False
 
