@@ -232,9 +232,9 @@ class QPlayer(BasicPlayer):
         self._boardpolicy = weights
 
 
-class NeuralPlayerBrain(torch.nn.Module):
+class SmartPlayerBrain(torch.nn.Module):
     def __init__(self):
-        super(NeuralPlayerBrain, self).__init__()
+        super(SmartPlayerBrain, self).__init__()
         self._inputdims  = [9, 9*9, 9]
         self._layers     = torch.nn.ModuleList()
         self._layercount = len(self._inputdims) - 1
@@ -260,11 +260,11 @@ class NeuralPlayerBrain(torch.nn.Module):
         return torch.sigmoid(self._layers[-1](x))
 
 
-class NeuralPlayer(BasicPlayer):
+class SmartPlayer(BasicPlayer):
     def __init__(self, lr=0.1, discount=0.99):
-        super(NeuralPlayer, self).__init__()
-        self._activebrain = NeuralPlayerBrain()   # = target_net
-        self._learningbrain = NeuralPlayerBrain() # = policy_net
+        super(SmartPlayer, self).__init__()
+        self._activebrain = SmartPlayerBrain()   # = target_net
+        self._learningbrain = SmartPlayerBrain() # = policy_net
         self._lr = lr
         self._discount = discount
         self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
