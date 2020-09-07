@@ -243,7 +243,6 @@ class SmartPlayerBrain(torch.nn.Module):
         self._inputdims  = [9, 9*9, 9]
         self._layers     = torch.nn.ModuleList()
         self._layercount = len(self._inputdims) - 1
-        self._batchnorm  = torch.nn.BatchNorm1d(self._inputdims[0])
         self._dropout    = torch.nn.Dropout(p=0.3)
         self._dropoutidx = 1
         self._activation = torch.nn.ReLU()
@@ -253,23 +252,20 @@ class SmartPlayerBrain(torch.nn.Module):
             torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
             self._layers.append(layer_to_add)
 
-        print(self)
-
     def forward(self, x):
         x = x.float()
-        #x = self._batchnorm(x)
         for layer_index in range(self._layercount - 1):
-            # if layer_index == self._dropoutidx:
-            #     x = self._dropout(x)
+            if layer_index == self._dropoutidx:
+                x = self._dropout(x)
             x = self._activation(self._layers[layer_index](x))
         return torch.sigmoid(self._layers[-1](x))
 
 
 class SmartPlayer(BasicPlayer):
-    def __init__(self, lr=0.1, discount=0.99):
+    def __init__(self, lr=0.1, discount=0.100):
         super(SmartPlayer, self).__init__()
-        self._activebrain = SmartPlayerBrain()   # = target_net
-        self._learningbrain = SmartPlayerBrain() # = policy_net
+        self._activebrain = SmartPlayerBrain()   # = target net
+        self._learningbrain = SmartPlayerBrain() # = policy net
         self._lr = lr
         self._discount = discount
         self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
@@ -302,10 +298,10 @@ class SmartPlayer(BasicPlayer):
 
     def backpropagate(self, playedboard, playedmove, prize):
         self._optimizer.zero_grad()
-        torchboard = torch.from_numpy(playedboard).flatten().type(torch.int8)
-        actionvalues = self._learningbrain(torchboard).reshape(3,3)
+        torchboard = torch.from_numpy(playedboard).type(torch.int8)
+        actionvalues = self._learningbrain(torchboard.flatten()).reshape(3,3)
         targets = actionvalues.clone().detach()
-        targets[torch.ByteTensor(playedboard == 0)] = 0
+        targets[torchboard == 0] = 0
         targets[playedmove] = prize
 
         loss = self._loss(actionvalues, targets)
@@ -320,3 +316,4 @@ class SmartPlayer(BasicPlayer):
 
     def setWeights(self, weights):
         self._activebrain.load_state_dict(weights)
+        
