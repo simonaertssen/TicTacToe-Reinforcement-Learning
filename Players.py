@@ -4,6 +4,7 @@ import pickle
 import tqdm
 
 import numpy as np
+from np.random import rand
 
 from numba import jit, njit
 from random import choice
@@ -32,7 +33,7 @@ class BasicPlayer:
         return board
 
     def getBoardState(self, board):
-        return str(board.flatten().tolist())
+        return board.tostring()
 
     def chooseMove(self, possible_moves, board):
         raise NotImplementedError
@@ -190,7 +191,7 @@ class QPlayer(BasicPlayer):
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        if self._trainable and np.random.rand(1) <= self._explore:
+        if self._trainable and rand(1) <= self._explore:
             move = choice(possible_moves)
         else:
             value_of_action_max = - np.Inf
