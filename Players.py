@@ -1,10 +1,12 @@
-import numpy as np
 import os
 import torch
-import random
 import pickle
 import tqdm
 
+import numpy as np
+
+from numba import jit, njit
+from random import choice
 from Game import didPlayerWinAccordingToTheRules
 
 class BasicPlayer:
@@ -70,7 +72,7 @@ class RandomPlayer(BasicPlayer):
         super(RandomPlayer, self).__init__()
 
     def chooseMove(self, possible_moves, board):
-        return random.choice(possible_moves)
+        return choice(possible_moves)
 
 
 class HumanPlayer(BasicPlayer):
@@ -92,11 +94,8 @@ class MiniMaxPlayer(BasicPlayer):
         super(MiniMaxPlayer, self).__init__()
         self._maxdepth = 100
 
-    def maximising(self, symbol):
-        return symbol == self.symbol
-
     def chooseMove(self, possible_moves, board):
-        best_score_index = self.rateMovesThroughMiniMax(possible_moves, board, self.symbol)
+        best_score_index = self.rateMovesThroughMiniMax(possible_moves.copy(), board.copy(), self.symbol)
         return possible_moves[best_score_index]
 
     def switchPlayerSymbol(self, symbol):
@@ -105,29 +104,26 @@ class MiniMaxPlayer(BasicPlayer):
     def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0):
         if depth > self._maxdepth:
             return [0]
-        alternative_moves = moves.copy()
-        alternative_board = board.copy()
 
-        ismaximising = self.maximising(playersymbol)
+        ismaximising = playersymbol == self.symbol
 
         scores = []
         for move in moves:
-            alternative_moves.remove(move)
-            alternative_board[move] = playersymbol
+            moves.remove(move)
+            board[move] = playersymbol
 
-            if didPlayerWinAccordingToTheRules(alternative_board, playersymbol):
+            if didPlayerWinAccordingToTheRules(board, playersymbol):
                 score = 1 if ismaximising else -1
-            elif not (alternative_board == 0).any():
+            elif not (board == 0).any():
                 score = 0
             else:
-                score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1)
+                score = self.rateMovesThroughMiniMax(moves, board, self.switchPlayerSymbol(playersymbol), depth + 1)
             scores.append(score)
-            alternative_moves.append(move)
-            alternative_board[move] = 0
+            moves.append(move)
+            board[move] = 0
 
         decisivescore = max(scores) if ismaximising else min(scores)
         if depth == 0:
-            print("scores =", scores, "bestscoreindex =", scores.index(decisivescore))
             return scores.index(decisivescore)
         else:
             return decisivescore
@@ -137,30 +133,24 @@ class AlphaBetaPlayer(MiniMaxPlayer):
     def __init__(self):
         super(AlphaBetaPlayer, self).__init__()
 
-    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0, alpha=-np.Inf, beta=np.Inf):
+    def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0, alpha=-np.Inf, beta=+np.Inf):
         if depth > self._maxdepth:
             return [0]
-        printing = False
-        if len(moves) < 3 and depth < 3:
-            printing = True
 
-        alternative_moves = moves.copy()
-        alternative_board = board.copy()
-
-        ismaximising = self.maximising(playersymbol)
+        ismaximising = playersymbol == self.symbol
         bestscore = - np.Inf if ismaximising else np.Inf
         bestscoreindex = 0
 
         for index, move in enumerate(moves):
-            alternative_moves.remove(move)
-            alternative_board[move] = playersymbol
+            moves.remove(move)
+            board[move] = playersymbol
 
-            if didPlayerWinAccordingToTheRules(alternative_board, playersymbol):
+            if didPlayerWinAccordingToTheRules(board, playersymbol):
                 score = 1 if ismaximising else -1
-            elif not (alternative_board == 0).any():
+            elif not (board == 0).any():
                 score = 0
             else:
-                score = self.rateMovesThroughMiniMax(alternative_moves, alternative_board, self.switchPlayerSymbol(playersymbol), depth + 1, alpha, beta)
+                score = self.rateMovesThroughMiniMax(moves, board, self.switchPlayerSymbol(playersymbol), depth + 1, alpha, beta)
 
             if ismaximising:
                 if score > bestscore:
@@ -177,8 +167,8 @@ class AlphaBetaPlayer(MiniMaxPlayer):
                     return bestscore
                 beta = min(bestscore, beta)
 
-            alternative_moves.append(move)
-            alternative_board[move] = 0
+            moves.append(move)
+            board[move] = 0
 
         if depth == 0:
             return bestscoreindex
@@ -201,7 +191,7 @@ class QPlayer(BasicPlayer):
 
     def chooseMove(self, possible_moves, board):
         if self._trainable and np.random.rand(1) <= self._explore:
-            move = random.choice(possible_moves)
+            move = choice(possible_moves)
         else:
             value_of_action_max = - np.Inf
             alternative_board = board.copy()
