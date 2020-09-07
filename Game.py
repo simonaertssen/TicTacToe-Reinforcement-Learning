@@ -25,11 +25,6 @@ class TicTacToe:
         self._max_moves = self._rows * self._cols
         self._currentmove = 0
 
-        self._reward_win  = 1.0
-        self._reward_lose = -1.0
-        self._reward_draw = 0.5
-        self._reward_draw_opponent = 0.5
-
         self._gameStarted = False
         self._gameEnded = False
         self._verbose = True
@@ -90,15 +85,15 @@ class TicTacToe:
         self.returnMoveToGUI(move, self.activeplayerindex)
         if self.didTheCurrentPlayerWin():
             self.activeplayer.wins += 1
-            self.activeplayer.reward(self._reward_win)
-            self.players[(self.activeplayerindex+1)%2].reward(self._reward_lose)
+            self.activeplayer.reward("WINNER")
+            self.players[(self.activeplayerindex+1)%2].reward("LOSER")
             # message = "Player {} won the game.".format(self.activeplayer.name)
             message = self.activeplayer.symbol
             self.stop(message)
 
         elif self._currentmove + 1 >= self._max_moves:
-            self.activeplayer.reward(self._reward_draw)
-            self.players[(self.activeplayerindex+1)%2].reward(self._reward_draw_opponent)
+            self.activeplayer.reward("CHOSEDRAW")
+            self.players[(self.activeplayerindex+1)%2].reward("MADEDRAW")
             # message = "Game ended in draw."
             message = 0
             self.stop(message)

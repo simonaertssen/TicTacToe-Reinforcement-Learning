@@ -4,7 +4,7 @@ import pickle
 import tqdm
 
 import numpy as np
-from np.random import rand
+from numpy.random import rand
 
 from random import choice
 from Game import didPlayerWinAccordingToTheRules
@@ -18,6 +18,7 @@ class BasicPlayer:
         self._trainable = False
         self._verbose = True
         self._savepath = "trained{}.pickle".format(self.name)
+        self._rewards = {"WINNER": 1.0, "LOSER":-1.0, "MADEDRAW":0.5, "CHOSEDRAW":0.5}
 
     def __repr__(self):
         return "{}: {}".format(self.name, self.symbol)
@@ -221,6 +222,7 @@ class QPlayer(BasicPlayer):
     def reward(self, prize):
         if not self._trainable:
             return
+        prize = self._rewards[prize]
         for move in reversed(self._playedmoves):
             value = self._boardpolicy[move]
             value += self._lr * (self._lrdecay * prize - value)
@@ -240,7 +242,7 @@ class QPlayer(BasicPlayer):
 class SmartPlayerBrain(torch.nn.Module):
     def __init__(self):
         super(SmartPlayerBrain, self).__init__()
-        self._inputdims  = [9, 9*9, 9]
+        self._inputdims  = [9, 81, 9]
         self._layers     = torch.nn.ModuleList()
         self._layercount = len(self._inputdims) - 1
         self._dropout    = torch.nn.Dropout(p=0.3)
@@ -249,7 +251,7 @@ class SmartPlayerBrain(torch.nn.Module):
 
         for i, layer in enumerate(range(self._layercount)):
             layer_to_add = torch.nn.Linear(self._inputdims[i], self._inputdims[i+1])
-            torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
+            #torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
             self._layers.append(layer_to_add)
 
     def forward(self, x):
@@ -262,14 +264,16 @@ class SmartPlayerBrain(torch.nn.Module):
 
 
 class SmartPlayer(BasicPlayer):
-    def __init__(self, lr=0.1, discount=0.100):
+    def __init__(self, lr=0.1, lrdecay=0.98, discount=0.99):
         super(SmartPlayer, self).__init__()
         self._activebrain = SmartPlayerBrain()   # = target net
         self._learningbrain = SmartPlayerBrain() # = policy net
         self._lr = lr
+        self._lrdecay = lrdecay
         self._discount = discount
         self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
         self._loss = torch.nn.MSELoss()
+        self._rewards = {"WINNER": 1.0, "LOSER":-1.0, "MADEDRAW":0.5, "CHOSEDRAW":0.5}
 
         self._playedmoves = []
         self._trainable = True
@@ -286,6 +290,7 @@ class SmartPlayer(BasicPlayer):
     def reward(self, prize):
         if not self._trainable:
             return
+        prize = self._rewards[prize]
         for i, (board, move) in enumerate(reversed(self._playedmoves)):
             if i != 0:
                 with torch.no_grad():
@@ -295,6 +300,10 @@ class SmartPlayer(BasicPlayer):
                     prize = self._discount * maxvalue
             self.backpropagate(board, move, prize)
         self._activebrain.load_state_dict(self._learningbrain.state_dict())
+
+        self._lr *= self._lrdecay
+        for param_group in self._optimizer.param_groups:
+            param_group['lr'] = self._lr
 
     def backpropagate(self, playedboard, playedmove, prize):
         self._optimizer.zero_grad()
@@ -316,4 +325,3 @@ class SmartPlayer(BasicPlayer):
 
     def setWeights(self, weights):
         self._activebrain.load_state_dict(weights)
-        
