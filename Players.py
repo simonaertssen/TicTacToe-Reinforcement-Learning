@@ -247,7 +247,7 @@ class NeuralPlayerBrain(torch.nn.Module):
         self._inputdims  = [9, 9*9, 9]
         self._layers     = torch.nn.ModuleList()
         self._layercount = len(self._inputdims) - 1
-        self._batchnorm  = torch.nn.BatchNorm1d(self.inputdims[0])
+        self._batchnorm  = torch.nn.BatchNorm1d(self._inputdims[0])
         self._dropout    = torch.nn.Dropout(p=0.3)
         self._dropoutidx = 1
         self._activation = torch.nn.ReLU()
@@ -257,11 +257,14 @@ class NeuralPlayerBrain(torch.nn.Module):
             torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
             self._layers.append(layer_to_add)
 
+        print(self)
+
     def forward(self, x):
-        x = self._batchnorm(x)
+        x = x.float()
+        #x = self._batchnorm(x)
         for layer_index in range(self._layercount - 1):
-            if layer_index == self._dropoutidx:
-                x = self._dropout(x)
+            # if layer_index == self._dropoutidx:
+            #     x = self._dropout(x)
             x = self._activation(self._layers[layer_index](x))
         return torch.sigmoid(self._layers[-1](x))
 
@@ -280,10 +283,10 @@ class NeuralPlayer(BasicPlayer):
         self._trainable = True
 
     def chooseMove(self, possible_moves, board):
-        torchboard = torch.from_numpy(board).flatten().type(torch.int8)
-        actionvalues = self._activebrain(torchboard)
+        torchboard = torch.from_numpy(board).flatten()
+        actionvalues = self._activebrain(torchboard).reshape(3,3)
         possible_actionvalues = [actionvalues[move].item() for move in possible_moves]
-        index, max_actionvalues = max(possible_actionvalues, key=lambda x: x[1])
+        index, max_actionvalues = max(enumerate(possible_actionvalues), key=lambda x: x[1])
         move = possible_moves[index]
         self._playedmoves.append((board, move))
         return move
@@ -294,21 +297,20 @@ class NeuralPlayer(BasicPlayer):
         for i, (board, move) in enumerate(reversed(self._playedmoves)):
             if i != 0:
                 with torch.no_grad():
-                    torchboard = torch.from_numpy(board).flatten().type(torch.int8)
+                    torchboard = torch.from_numpy(board).flatten()
                     actionvalues = self._activebrain(torchboard)
                     maxvalue = torch.max(actionvalues).item()
                     prize = self._discount * maxvalue
             self.backpropagate(board, move, prize)
         self._activebrain.load_state_dict(self._learningbrain.state_dict())
 
-    def backpropagate(playedboard, playedmove, prize):
+    def backpropagate(self, playedboard, playedmove, prize):
         self._optimizer.zero_grad()
         torchboard = torch.from_numpy(playedboard).flatten().type(torch.int8)
-        actionvalues = self._learningbrain(torchboard)
-
+        actionvalues = self._learningbrain(torchboard).reshape(3,3)
         targets = actionvalues.clone().detach()
-        target[playedmove] = prize
-        target[playedboard == 0] = 0
+        targets[torch.ByteTensor(playedboard == 0)] = 0
+        targets[playedmove] = prize
 
         loss = self._loss(actionvalues, targets)
         loss.backward()
