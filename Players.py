@@ -225,9 +225,10 @@ class QPlayer(BasicPlayer):
         prize = self.rewards[prize]
         for move in reversed(self._playedmoves):
             value = self._boardpolicy[move]
-            value += self._lr * (self._lrdecay * prize - value)
+            value += self._lr * (prize - value)
             self._boardpolicy[move] = prize = value
         self._explore *= self._exploredecay
+        self._lr *= self._lrdecay
 
     def reset(self):
         self._playedmoves = []
