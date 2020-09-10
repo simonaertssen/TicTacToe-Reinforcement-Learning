@@ -137,6 +137,14 @@ class AlphaBetaPlayer(MiniMaxPlayer):
     def __init__(self):
         super(AlphaBetaPlayer, self).__init__()
         self._moves = {}
+        self._trainable = True
+        self.loadPolicy()
+
+    def getWeights(self):
+        return self._moves
+
+    def setWeights(self, weights):
+        self._moves = weights
 
     def chooseMove(self, possible_moves, board):
         boardstate = self.getBoardState(board)
@@ -191,12 +199,6 @@ class AlphaBetaPlayer(MiniMaxPlayer):
             return bestscoreindex
         else:
             return bestscore
-
-        def getWeights(self):
-            return self._moves
-
-        def setWeights(self, weights):
-            self._moves = weights
 
 
 class QPlayer(BasicPlayer):
@@ -268,7 +270,6 @@ class SmartPlayerBrain(torch.nn.Module):
 
         for i, layer in enumerate(range(self._layercount)):
             layer_to_add = torch.nn.Linear(self._inputdims[i], self._inputdims[i+1])
-            #torch.nn.init.normal_(layer_to_add.weight, mean=0, std=0.02)
             self._layers.append(layer_to_add)
 
     def forward(self, x):
@@ -289,7 +290,6 @@ class SmartPlayer(BasicPlayer):
         self._lrdecay = lrdecay
         self._discount = discount
         self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr, momentum=0.9)
-        #self._optimizer = torch.optim.Adam(self._learningbrain.parameters(), lr=self._lr)
 
         self._loss = torch.nn.MSELoss()
         self.rewards = {"WINNER": 1.0, "LOSER":-1.0, "MADEDRAW":0.5, "CHOSEDRAW":0.5}
@@ -326,7 +326,7 @@ class SmartPlayer(BasicPlayer):
 
     def backpropagate(self, playedboard, playedmove, prize):
         self._optimizer.zero_grad()
-        torchboard = torch.from_numpy(playedboard).type(torch.int8)
+        torchboard = torch.from_numpy(playedboard)
         actionvalues = self._learningbrain(torchboard.flatten()).reshape(3,3)
         targets = actionvalues.clone().detach()
         targets[torchboard == 0] = 0
