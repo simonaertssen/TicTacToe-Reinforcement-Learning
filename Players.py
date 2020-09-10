@@ -136,6 +136,16 @@ class MiniMaxPlayer(BasicPlayer):
 class AlphaBetaPlayer(MiniMaxPlayer):
     def __init__(self):
         super(AlphaBetaPlayer, self).__init__()
+        self._moves = {}
+
+    def chooseMove(self, possible_moves, board):
+        boardstate = self.getBoardState(board)
+        if boardstate in self._moves:
+            return self._moves[boardstate]
+        else:
+            best_score_index = self.rateMovesThroughMiniMax(possible_moves, board, self.symbol)
+            self._moves[boardstate] = possible_moves[best_score_index]
+            return possible_moves[best_score_index]
 
     def rateMovesThroughMiniMax(self, moves, board, playersymbol, depth=0, alpha=-np.Inf, beta=+np.Inf):
         if depth > self._maxdepth:
@@ -181,6 +191,12 @@ class AlphaBetaPlayer(MiniMaxPlayer):
             return bestscoreindex
         else:
             return bestscore
+
+        def getWeights(self):
+            return self._moves
+
+        def setWeights(self, weights):
+            self._moves = weights
 
 
 class QPlayer(BasicPlayer):
@@ -272,7 +288,9 @@ class SmartPlayer(BasicPlayer):
         self._lr = lr
         self._lrdecay = lrdecay
         self._discount = discount
-        self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr)
+        self._optimizer = torch.optim.SGD(self._learningbrain.parameters(), lr=self._lr, momentum=0.9)
+        #self._optimizer = torch.optim.Adam(self._learningbrain.parameters(), lr=self._lr)
+
         self._loss = torch.nn.MSELoss()
         self.rewards = {"WINNER": 1.0, "LOSER":-1.0, "MADEDRAW":0.5, "CHOSEDRAW":0.5}
 
